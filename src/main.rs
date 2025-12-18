@@ -8,7 +8,7 @@ use sopmod::paths;
 
 #[derive(Parser)]
 #[command(name = "SOPMOD")]
-#[command(about = "Version manager for go and sop", long_about = None)]
+#[command(about = "Soppo version manager", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
