@@ -14,6 +14,9 @@ import "github.com/halcyonnouveau/sopmod/gen/internal/config"
 import "github.com/halcyonnouveau/sopmod/gen/internal/install"
 import "github.com/halcyonnouveau/sopmod/gen/internal/paths"
 
+// Set at build time with -ldflags "-X main.version=v0.2.0"
+var version = "dev"
+
 func main() {
     // Check if running as shim (invoked as "sop" not "sopmod")
     arg0 := os.Args[0]
@@ -60,6 +63,9 @@ func main() {
         err = cmdUpdate(args)
     case "help", "-h", "--help":
         printUsage()
+        return
+    case "version", "-v", "--version":
+        fmt.Println(("sopmod " + version))
         return
     default:
         fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)

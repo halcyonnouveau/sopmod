@@ -42,7 +42,7 @@ jobs:
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -o sopmod${ext} ./gen
+          go build -ldflags "-X main.version=${{ github.ref_name }}" -o sopmod${ext} ./gen
       - name: Archive
         shell: bash
         run: |
