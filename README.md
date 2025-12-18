@@ -1,6 +1,6 @@
 # SOPMOD II
 
-Version manager for [Soppo](https://github.com/halcyonnouveau/soppo). Written entirely in Soppo.
+Version manager for [Soppo](https://github.com/halcyonnouveau/soppo). SOPMOD is entirely dogfooded and has been rewritten from Rust to Soppo, hence the "II".
 
 SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation.
 
