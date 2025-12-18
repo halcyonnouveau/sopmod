@@ -1,6 +1,6 @@
 # SOPMOD II
 
-Version manager for [Soppo](https://github.com/halcyonnouveau/soppo).
+Version manager for [Soppo](https://github.com/halcyonnouveau/soppo). Written entirely in Soppo.
 
 SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation.
 
@@ -8,12 +8,6 @@ SOPMOD handles installing, updating, and switching between multiple versions of 
 
 ```bash
 curl -fsSL https://soppolang.dev/install.sh | sh
-```
-
-Or with cargo:
-
-```bash
-cargo install sopmod
 ```
 
 After installation, add `~/.sopmod/bin` to your PATH:
@@ -35,13 +29,10 @@ sopmod install sop 0.4.1
 sopmod update sop
 
 # Set default version
-sopmod default sop 0.4.1
+sopmod default 0.4.1
 
 # List installed versions
 sopmod list
-
-# Show active binary path
-sopmod which sop
 
 # Remove a version
 sopmod remove sop 0.4.0
