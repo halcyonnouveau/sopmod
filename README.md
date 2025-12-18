@@ -104,7 +104,7 @@ The `sop` binary in `~/.sopmod/bin/` is a shim that:
 1. Checks for `sop.mod` in the current or parent directories
 2. Uses the pinned version if specified
 3. Falls back to the default version from `config.toml`
-4. Executes the appropriate Sop binary
+4. Executes the appropriate `sop` binary
 
 ## Licence
 

@@ -486,14 +486,14 @@ fn find_or_install_compatible_go(
         return Ok(Some(version.clone()));
     }
 
-    // No compatible Go installed, install the minimum required version
+    // No compatible Go installed, install latest (which will satisfy the minimum)
     println!(
-        "{} Installing go {} (required by sop {})...",
+        "{} Installing go (sop {} requires {}+)...",
         style("→").cyan(),
+        sop_version,
         style(compat_info.min).bold(),
-        sop_version
     );
-    let installed = install::install_go(compat_info.min, false)?;
+    let installed = install::install_go("latest", false)?;
     Ok(Some(installed))
 }
 
