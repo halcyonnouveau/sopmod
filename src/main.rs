@@ -7,7 +7,7 @@ use sopmod::install;
 use sopmod::paths;
 
 #[derive(Parser)]
-#[command(name = "sopmod")]
+#[command(name = "SOPMOD")]
 #[command(about = "Version manager for go and sop", long_about = None)]
 struct Cli {
     #[command(subcommand)]
