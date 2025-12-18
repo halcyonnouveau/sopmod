@@ -6,6 +6,12 @@ permissions:
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v0.2.1)"
+        required: true
+        type: string
 
 jobs:
   release:
@@ -30,19 +36,22 @@ jobs:
             goarch: amd64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
         with:
-          go-version: "1.25"
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
       - name: Build
         shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ inputs.tag || github.ref_name }}
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -ldflags "-X main.version=${{ github.ref_name }}" -o sopmod${ext} ./gen
+          go build -ldflags "-X main.version=${VERSION}" -o sopmod${ext} ./gen
       - name: Archive
         shell: bash
         run: |
@@ -54,4 +63,5 @@ jobs:
       - name: Upload
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: sopmod-${{ matrix.goos }}-${{ matrix.goarch }}.*
