@@ -63,6 +63,18 @@ enum Commands {
 }
 
 fn main() {
+    // Check if running as shim (invoked as "sop" not "sopmod")
+    let arg0 = std::env::args().next().unwrap_or_default();
+    let is_shim = arg0.ends_with("sop") && !arg0.ends_with("sopmod");
+
+    if is_shim {
+        if let Err(e) = run_shim() {
+            eprintln!("{} {}", style("error:").red().bold(), e);
+            std::process::exit(1);
+        }
+        return;
+    }
+
     // Ensure sopmod directories exist
     if let Err(e) = paths::ensure_dirs() {
         eprintln!("Failed to create sopmod directories: {}", e);
@@ -96,7 +108,18 @@ fn cmd_install(tool: &str, version: &str, verbose: bool) -> Result<(), Box<dyn s
             install::install_go(version, verbose)?;
         }
         "sop" => {
-            install::install_sop(version, verbose)?;
+            let resolved = install::install_sop(version, verbose)?;
+
+            // Set as default if no default exists
+            let config = Config::load();
+            if config.default_sop.is_none() {
+                println!(
+                    "{} Setting sop {} as default (first install)",
+                    style("→").cyan(),
+                    style(&resolved).bold()
+                );
+                cmd_default("sop", &resolved)?;
+            }
         }
         _ => {
             return Err(format!("Unknown tool '{}'. Use 'go' or 'sop'.", tool).into());
@@ -201,10 +224,8 @@ fn cmd_default(tool: &str, version: &str) -> Result<(), Box<dyn std::error::Erro
 
             config.default_sop = Some(resolved.clone());
 
-            // Create/update symlink
-            let target = paths::sop_binary(&resolved);
-            let link = paths::sop_symlink();
-            create_symlink(&target, &link)?;
+            // Copy sopmod binary to ~/.sopmod/bin/sop (acts as shim)
+            install_shim()?;
 
             println!(
                 "{} Default sop version set to {}",
@@ -248,30 +269,6 @@ fn prompt_install(tool: &str, version: &str) -> Result<bool, Box<dyn std::error:
 
     let input = input.trim().to_lowercase();
     Ok(input.is_empty() || input == "y" || input == "yes")
-}
-
-fn create_symlink(target: &std::path::Path, link: &std::path::Path) -> std::io::Result<()> {
-    // Remove existing symlink/file if present
-    if link.exists() || link.symlink_metadata().is_ok() {
-        std::fs::remove_file(link)?;
-    }
-
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(target, link)?;
-    }
-
-    #[cfg(windows)]
-    {
-        // On Windows, try symlink first, fall back to hard link or copy
-        if std::os::windows::fs::symlink_file(target, link).is_err() {
-            // Symlinks may require admin privileges on Windows
-            // Fall back to copying the file
-            std::fs::copy(target, link)?;
-        }
-    }
-
-    Ok(())
 }
 
 fn print_path_hint() {
@@ -442,9 +439,8 @@ fn update_sop() -> Result<(), Box<dyn std::error::Error>> {
     if should_update_default && config.default_sop.as_deref() != Some(&latest) {
         config.default_sop = Some(latest.clone());
 
-        let target = paths::sop_binary(&latest);
-        let link = paths::sop_symlink();
-        create_symlink(&target, &link)?;
+        // Update shim binary
+        install_shim()?;
 
         println!(
             "{} Default sop version updated to {}",
@@ -505,4 +501,96 @@ fn find_or_install_compatible_go(
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     let parse = |v: &str| -> Vec<u32> { v.split('.').filter_map(|p| p.parse().ok()).collect() };
     parse(a).cmp(&parse(b))
+}
+
+/// Install the shim binary to ~/.sopmod/bin/sop
+fn install_shim() -> Result<(), Box<dyn std::error::Error>> {
+    let current_exe = std::env::current_exe()?;
+    let shim_path = paths::sop_symlink(); // This is ~/.sopmod/bin/sop
+
+    // Remove existing shim if present
+    if shim_path.exists() {
+        std::fs::remove_file(&shim_path)?;
+    }
+
+    // Copy current binary to shim location
+    std::fs::copy(&current_exe, &shim_path)?;
+
+    // Make executable on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&shim_path, std::fs::Permissions::from_mode(0o755))?;
+    }
+
+    Ok(())
+}
+
+/// Run as shim - find the right sop version and exec it
+fn run_shim() -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::process::CommandExt;
+    use std::process::Command;
+
+    // Find sop version to use
+    let version = find_sop_version()?;
+
+    // Get path to sop binary
+    let sop_binary = paths::sop_binary(&version);
+    if !sop_binary.exists() {
+        return Err(format!(
+            "sop {} is not installed. Run `sopmod install sop {}`",
+            version, version
+        )
+        .into());
+    }
+
+    // Exec sop with all original args (skip argv[0])
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let err = Command::new(&sop_binary).args(&args).exec();
+
+    // exec() only returns on error
+    Err(format!("Failed to exec sop: {}", err).into())
+}
+
+/// Find which sop version to use
+fn find_sop_version() -> Result<String, Box<dyn std::error::Error>> {
+    // Check sop.mod in current dir and parents
+    if let Some(version) = find_sop_mod_version()? {
+        return Ok(version);
+    }
+
+    // Fall back to default from config
+    let config = Config::load();
+    if let Some(version) = config.default_sop {
+        return Ok(version);
+    }
+
+    Err("No sop version configured. Run `sopmod install sop latest`".into())
+}
+
+/// Search for sop.mod and extract sop version requirement
+fn find_sop_mod_version() -> Result<Option<String>, Box<dyn std::error::Error>> {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct SopMod {
+        sop: Option<String>,
+    }
+
+    let mut current = std::env::current_dir()?;
+
+    loop {
+        let sop_mod = current.join("sop.mod");
+        if sop_mod.exists() {
+            let content = std::fs::read_to_string(&sop_mod)?;
+            let parsed: SopMod = toml::from_str(&content)?;
+            return Ok(parsed.sop);
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    Ok(None)
 }

@@ -17,12 +17,8 @@ cargo install sopmod
 ## Usage
 
 ```bash
-# Install sop and go
+# Install sop
 sopmod install sop latest
-sopmod install go latest
-
-# Set default (creates symlink in ~/.sopmod/bin/)
-sopmod default sop latest
 
 # Update to latest
 sopmod update sop
