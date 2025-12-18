@@ -11,13 +11,36 @@ pub struct GoCompat {
 
 /// Returns the Go version compatibility for a given sop version
 pub fn go_compat(sop_version: &str) -> Option<GoCompat> {
-    // Strip 'v' prefix if present
-    let _version = sop_version.strip_prefix('v').unwrap_or(sop_version);
+    let version = sop_version.strip_prefix('v').unwrap_or(sop_version);
 
-    Some(GoCompat {
-        min: "1.21",
-        max: None,
-    })
+    // Parse sop version
+    let sop_ver = match Version::parse(&normalise_version(version)) {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+
+    // Add new Go requirements here (check newest first)
+    // if sop_ver >= Version::new(0, 6, 0) {
+    //     return Some(GoCompat { min: "1.25", max: None });
+    // }
+
+    if sop_ver >= Version::new(0, 1, 0) {
+        return Some(GoCompat {
+            min: "1.21",
+            max: None,
+        });
+    }
+
+    None
+}
+
+fn normalise_version(version: &str) -> String {
+    let parts: Vec<&str> = version.split('.').collect();
+    match parts.len() {
+        1 => format!("{}.0.0", version),
+        2 => format!("{}.0", version),
+        _ => version.to_string(),
+    }
 }
 
 /// Check if a Go version satisfies the requirements for a sop version
@@ -73,15 +96,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_go_compat_known_versions() {
+    fn test_go_compat() {
         assert!(go_compat("0.4.1").is_some());
         assert!(go_compat("v0.4.1").is_some());
         assert!(go_compat("0.1.0").is_some());
-    }
-
-    #[test]
-    fn test_go_compat_unknown_version() {
-        assert!(go_compat("99.0.0").is_none());
+        assert!(go_compat("99.0.0").is_some()); // All versions require Go 1.21+
     }
 
     #[test]
