@@ -2,7 +2,7 @@
 
 Version manager for [Soppo](https://github.com/halcyonnouveau/soppo).
 
-SOPMOD handles installing, updating, and switching between multiple versions of Sop. It also manages Go installations that Sop uses internally for compilation.
+SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation.
 
 ## Install
 
@@ -49,7 +49,7 @@ sopmod remove sop 0.4.0
 
 ## Per-project versions
 
-Pin a specific Sop version for your project by adding to `sop.mod`:
+Pin a specific Soppo version for your project by adding to `sop.mod`:
 
 ```toml
 sop = "0.4"
@@ -67,7 +67,7 @@ error: sop.mod requires sop 0.5, but 0.4.1 is installed
 
 ## Go versions
 
-Sop compiles to Go, so it needs a Go installation. SOPMOD manages this automatically:
+Soppo compiles to Go, so it needs a Go installation. SOPMOD manages this automatically:
 
 ```bash
 # Install Go (usually not needed - done automatically)
@@ -77,7 +77,7 @@ sopmod install go 1.22
 sopmod list go
 ```
 
-When you set a default Sop version, SOPMOD automatically installs and configures a compatible Go version. You can also pin Go in `sop.mod`:
+When you set a default Soppo version, SOPMOD automatically installs and configures a compatible Go version. You can also pin Go in `sop.mod`:
 
 ```toml
 go = "1.22"
