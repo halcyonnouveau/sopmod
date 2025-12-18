@@ -4,8 +4,14 @@ Version manager for [Soppo](https://github.com/halcyonnouveau/soppo).
 
 ## Install
 
+```bash
+curl -fsSL https://soppolang.dev/install.sh | sh
 ```
-cargo install --git https://github.com/halcyonnouveau/sopmod
+
+Or with cargo:
+
+```bash
+cargo install sopmod
 ```
 
 ## Usage
