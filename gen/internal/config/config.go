@@ -41,7 +41,7 @@ func (c *Config) Save() error {
 // SaveTo saves config to a specific path
 func (c *Config) SaveTo(path string) error {
     dir := filepath.Dir(path)
-    _err0 := os.MkdirAll(dir, 493)
+    _err0 := os.MkdirAll(dir, 0o755)
     if _err0 != nil {
         return _err0
     }

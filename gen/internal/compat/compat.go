@@ -27,7 +27,7 @@ func GoCompatFor(sopVersion string) *GoCompat {
     // if major > 0 || (major == 0 && minor >= 6) {
     //     return &GoCompat{Min: "1.25", Max: nil}
     // }
-    if ((major > 0) || ((major == 0) && (minor >= 1))) {
+    if major > 0 || (major == 0 && minor >= 1) {
         return (&GoCompat{Min: "1.21", Max: nil})
     }
 
@@ -37,7 +37,7 @@ func GoCompatFor(sopVersion string) *GoCompat {
 // IsGoCompatible checks if a Go version satisfies the requirements for a sop version
 func IsGoCompatible(goVersion string, sopVersion string) bool {
     compat := GoCompatFor(sopVersion)
-    if (compat == nil) {
+    if compat == nil {
         // Unknown sop version, assume compatible
         return true
     }
@@ -58,7 +58,7 @@ func IsGoCompatible(goVersion string, sopVersion string) bool {
     }
 
     // Check maximum if set
-    if (compat.Max != nil) {
+    if compat.Max != nil {
         maxMajor, maxMinor, maxPatch, _err2 := parseVersion((*compat.Max))
         if _err2 != nil {
             return false
@@ -75,10 +75,10 @@ func IsGoCompatible(goVersion string, sopVersion string) bool {
 // CompatMessage returns a human-readable compatibility message for a sop version
 func CompatMessage(sopVersion string) string {
     compat := GoCompatFor(sopVersion)
-    if (compat == nil) {
+    if compat == nil {
         return fmt.Sprintf("sop %s has unknown go requirements", sopVersion)
     }
-    if (compat.Max != nil) {
+    if compat.Max != nil {
         return fmt.Sprintf("sop %s requires go %s to %s", sopVersion, compat.Min, (*compat.Max))
     }
     return fmt.Sprintf("sop %s requires go %s or later", sopVersion, compat.Min)
@@ -87,21 +87,21 @@ func CompatMessage(sopVersion string) string {
 func parseVersion(version string) (major int, minor int, patch int, err error) {
     parts := strings.Split(version, ".")
 
-    if (len(parts) >= 1) {
+    if len(parts) >= 1 {
         var _err0 error
         major, _err0 = strconv.Atoi(parts[0])
         if _err0 != nil {
             return 0, 0, 0, _err0
         }
     }
-    if (len(parts) >= 2) {
+    if len(parts) >= 2 {
         var _err1 error
         minor, _err1 = strconv.Atoi(parts[1])
         if _err1 != nil {
             return 0, 0, 0, _err1
         }
     }
-    if (len(parts) >= 3) {
+    if len(parts) >= 3 {
         var _err2 error
         patch, _err2 = strconv.Atoi(parts[2])
         if _err2 != nil {
@@ -113,12 +113,12 @@ func parseVersion(version string) (major int, minor int, patch int, err error) {
 }
 
 func versionAtLeast(aMajor int, aMinor int, aPatch int, bMajor int, bMinor int, bPatch int) bool {
-    if (aMajor != bMajor) {
-        return (aMajor > bMajor)
+    if aMajor != bMajor {
+        return aMajor > bMajor
     }
-    if (aMinor != bMinor) {
-        return (aMinor > bMinor)
+    if aMinor != bMinor {
+        return aMinor > bMinor
     }
-    return (aPatch >= bPatch)
+    return aPatch >= bPatch
 }
 

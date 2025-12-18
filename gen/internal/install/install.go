@@ -51,7 +51,7 @@ func DetectPlatform() (*Platform, error) {
 }
 
 func (p *Platform) GoArchiveExt() string {
-    if (p.OS == "windows") {
+    if p.OS == "windows" {
         return "zip"
     }
     return "tar.gz"
@@ -88,13 +88,13 @@ func ResolveLatestGo() (string, error) {
 
 // ResolveGoVersion resolves a Go version, handling "latest" and partial versions
 func ResolveGoVersion(version string) (string, error) {
-    if (version == "latest") {
+    if version == "latest" {
         return ResolveLatestGo()
     }
 
     // Check if it's a partial version like "1.22"
     parts := strings.Split(version, ".")
-    if (len(parts) == 2) {
+    if len(parts) == 2 {
         resp, _err0 := http.Get("https://go.dev/dl/?mode=json")
         if _err0 != nil {
             return "", _err0
@@ -107,9 +107,9 @@ func ResolveGoVersion(version string) (string, error) {
             return "", _err1
         }
 
-        prefix := ("go" + version)
+        prefix := "go" + version
         for _, r := range releases {
-            if (r.Stable && strings.HasPrefix(r.Version, prefix)) {
+            if r.Stable && strings.HasPrefix(r.Version, prefix) {
                 return strings.TrimPrefix(r.Version, "go"), nil
             }
         }
@@ -137,7 +137,7 @@ func InstallGo(version string, verbose bool) (string, error) {
 
     ext := platform.GoArchiveExt()
     filename := fmt.Sprintf("go%s.%s-%s.%s", resolved, platform.OS, platform.Arch, ext)
-    url := ("https://go.dev/dl/" + filename)
+    url := "https://go.dev/dl/" + filename
 
     if verbose {
         fmt.Printf("Downloading go %s from %s\n", resolved, url)
@@ -150,12 +150,12 @@ func InstallGo(version string, verbose bool) (string, error) {
     }
     defer resp.Body.Close()
 
-    if (resp.StatusCode != http.StatusOK) {
+    if resp.StatusCode != http.StatusOK {
         return "", fmt.Errorf("version not found: go %s for %s-%s", resolved, platform.OS, platform.Arch)
     }
 
     // Create temp file
-    tmpFile, _err3 := os.CreateTemp("", ("go-*." + ext))
+    tmpFile, _err3 := os.CreateTemp("", "go-*." + ext)
     if _err3 != nil {
         return "", _err3
     }
@@ -176,12 +176,12 @@ func InstallGo(version string, verbose bool) (string, error) {
         fmt.Printf("Extracting to %s\n", dest)
     }
 
-    _err5 := os.MkdirAll(dest, 493)
+    _err5 := os.MkdirAll(dest, 0o755)
     if _err5 != nil {
         return "", _err5
     }
 
-    if (ext == "zip") {
+    if ext == "zip" {
         _err6 := extractZip(tmpFile.Name(), dest)
         if _err6 != nil {
             return "", _err6
@@ -240,7 +240,7 @@ func ResolveLatestSop() (string, error) {
 
 // ResolveSopVersion resolves a sop version, handling "latest"
 func ResolveSopVersion(version string) (string, error) {
-    if (version == "latest") {
+    if version == "latest" {
         return ResolveLatestSop()
     }
     return version, nil
@@ -265,7 +265,7 @@ func InstallSop(version string, verbose bool) (string, error) {
 
     // Check Go compatibility
     compatInfo := compat.GoCompatFor(resolved)
-    if (compatInfo != nil) {
+    if compatInfo != nil {
         installedGo := ListInstalledGo()
         hasCompatible := false
         for _, v := range installedGo {
@@ -274,7 +274,7 @@ func InstallSop(version string, verbose bool) (string, error) {
                 break
             }
         }
-        if ((!hasCompatible) && (len(installedGo) > 0)) {
+        if (!hasCompatible) && len(installedGo) > 0 {
             fmt.Printf("\033[33mwarning:\033[0m %s\n", compat.CompatMessage(resolved))
             fmt.Printf("  Installed go versions: %s\n", strings.Join(installedGo, ", "))
             fmt.Printf("  \033[36mhint:\033[0m run \033[1msopmod install go %s\033[0m\n", compatInfo.Min)
@@ -283,7 +283,7 @@ func InstallSop(version string, verbose bool) (string, error) {
 
     // Map platform to Rust target triple
     var targetTriple string
-    switch ((platform.OS + "-") + platform.Arch) {
+    switch platform.OS + "-" + platform.Arch {
     case "linux-amd64":
         targetTriple = "x86_64-unknown-linux-gnu"
     case "linux-arm64":
@@ -301,7 +301,7 @@ func InstallSop(version string, verbose bool) (string, error) {
     }
 
     // Fetch release info
-    tag := ("v" + resolved)
+    tag := "v" + resolved
     releaseURL := fmt.Sprintf("https://api.github.com/repos/halcyonnouveau/soppo/releases/tags/%s", tag)
 
     req, _err2 := http.NewRequest("GET", releaseURL, nil)
@@ -316,7 +316,7 @@ func InstallSop(version string, verbose bool) (string, error) {
     }
     defer resp.Body.Close()
 
-    if (resp.StatusCode != http.StatusOK) {
+    if resp.StatusCode != http.StatusOK {
         return "", fmt.Errorf("version not found: sop %s", resolved)
     }
 
@@ -327,7 +327,7 @@ func InstallSop(version string, verbose bool) (string, error) {
     }
 
     // Find the right asset
-    assetPattern := ("sop-" + targetTriple)
+    assetPattern := "sop-" + targetTriple
     var asset *GitHubAsset
     for i := range release.Assets {
         if strings.HasPrefix(release.Assets[i].Name, assetPattern) {
@@ -335,7 +335,7 @@ func InstallSop(version string, verbose bool) (string, error) {
             break
         }
     }
-    if (asset == nil) {
+    if asset == nil {
         return "", fmt.Errorf("version not found: sop %s for %s", resolved, targetTriple)
     }
 
@@ -358,7 +358,7 @@ func InstallSop(version string, verbose bool) (string, error) {
     }
     defer resp.Body.Close()
 
-    if (resp.StatusCode != http.StatusOK) {
+    if resp.StatusCode != http.StatusOK {
         return "", fmt.Errorf("failed to download: %s", resp.Status)
     }
 
@@ -383,7 +383,7 @@ func InstallSop(version string, verbose bool) (string, error) {
         fmt.Printf("Extracting to %s\n", dest)
     }
 
-    _err9 := os.MkdirAll(dest, 493)
+    _err9 := os.MkdirAll(dest, 0o755)
     if _err9 != nil {
         return "", _err9
     }
@@ -394,7 +394,7 @@ func InstallSop(version string, verbose bool) (string, error) {
             return "", _err10
         }
     } else {
-        if (strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz")) {
+        if strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz") {
             _err11 := extractTarGz(tmpFile.Name(), dest)
             if _err11 != nil {
                 return "", _err11
@@ -402,7 +402,7 @@ func InstallSop(version string, verbose bool) (string, error) {
         } else {
             // Raw binary
             binaryName := "sop"
-            if (runtime.GOOS == "windows") {
+            if runtime.GOOS == "windows" {
                 binaryName = "sop.exe"
             }
             destPath := filepath.Join(dest, binaryName)
@@ -410,7 +410,7 @@ func InstallSop(version string, verbose bool) (string, error) {
             if _err12 != nil {
                 return "", _err12
             }
-            os.Chmod(destPath, 493)
+            os.Chmod(destPath, 0o755)
         }
     }
 
@@ -510,10 +510,10 @@ func extractTarGz(archivePath string, dest string) error {
 
     for {
         header, err := tr.Next()
-        if (err == io.EOF) {
+        if err == io.EOF {
             break
         }
-        if (err != nil) {
+        if err != nil {
             return err
         }
 
@@ -521,12 +521,12 @@ func extractTarGz(archivePath string, dest string) error {
 
         switch header.Typeflag {
         case tar.TypeDir:
-            _err2 := os.MkdirAll(target, 493)
+            _err2 := os.MkdirAll(target, 0o755)
             if _err2 != nil {
                 return _err2
             }
         case tar.TypeReg:
-            _err3 := os.MkdirAll(filepath.Dir(target), 493)
+            _err3 := os.MkdirAll(filepath.Dir(target), 0o755)
             if _err3 != nil {
                 return _err3
             }
@@ -536,7 +536,7 @@ func extractTarGz(archivePath string, dest string) error {
             }
             _, err = io.Copy(outFile, tr)
             outFile.Close()
-            if (err != nil) {
+            if err != nil {
                 return err
             }
             os.Chmod(target, os.FileMode(header.Mode))
@@ -553,18 +553,18 @@ func extractZip(archivePath string, dest string) error {
     defer r.Close()
 
     for _, f := range r.File {
-        if (f == nil) {
+        if f == nil {
             continue
         }
 
         target := filepath.Join(dest, f.Name)
 
         if f.FileInfo().IsDir() {
-            os.MkdirAll(target, 493)
+            os.MkdirAll(target, 0o755)
             continue
         }
 
-        _err1 := os.MkdirAll(filepath.Dir(target), 493)
+        _err1 := os.MkdirAll(filepath.Dir(target), 0o755)
         if _err1 != nil {
             return _err1
         }
@@ -581,7 +581,7 @@ func extractZip(archivePath string, dest string) error {
         _, err := io.Copy(outFile, rc)
         rc.Close()
         outFile.Close()
-        if (err != nil) {
+        if err != nil {
             return err
         }
 
@@ -609,11 +609,11 @@ func copyFile(src string, dst string) error {
 
 func fileExists(path string) bool {
     info, err := os.Stat(path)
-    return ((err == nil) && (!info.IsDir()))
+    return err == nil && (!info.IsDir())
 }
 
 func dirExists(path string) bool {
     info, err := os.Stat(path)
-    return ((err == nil) && info.IsDir())
+    return err == nil && info.IsDir()
 }
 

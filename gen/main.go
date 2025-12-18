@@ -21,7 +21,7 @@ func main() {
     // Check if running as shim (invoked as "sop" not "sopmod")
     arg0 := os.Args[0]
     base := filepath.Base(arg0)
-    isShim := (strings.HasSuffix(base, "sop") && (!strings.HasSuffix(base, "sopmod")))
+    isShim := strings.HasSuffix(base, "sop") && (!strings.HasSuffix(base, "sopmod"))
 
     if isShim {
         _err0 := runShim()
@@ -41,7 +41,7 @@ func main() {
         os.Exit(1)
     }
 
-    if (len(os.Args) < 2) {
+    if len(os.Args) < 2 {
         printUsage()
         os.Exit(1)
     }
@@ -65,7 +65,7 @@ func main() {
         printUsage()
         return
     case "version", "-v", "--version":
-        fmt.Println(("sopmod " + version))
+        fmt.Println("sopmod " + version)
         return
     default:
         fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
@@ -73,7 +73,7 @@ func main() {
         os.Exit(1)
     }
 
-    if (err != nil) {
+    if err != nil {
         fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
         os.Exit(1)
     }
@@ -98,7 +98,7 @@ func cmdInstall(args []string) error {
     fs.Parse(args)
 
     remaining := fs.Args()
-    if (len(remaining) < 2) {
+    if len(remaining) < 2 {
         return fmt.Errorf("usage: sopmod install <tool> <version>")
     }
 
@@ -118,7 +118,7 @@ func cmdInstall(args []string) error {
         }
         // Set as default if no default exists
         cfg := config.Load()
-        if (cfg.DefaultSop == nil) {
+        if cfg.DefaultSop == nil {
             fmt.Printf("\033[36m→\033[0m Setting sop \033[1m%s\033[0m as default (first install)\n", resolved)
             return setDefaultSop(resolved)
         }
@@ -133,7 +133,7 @@ func cmdList(args []string) error {
     cfg := config.Load()
 
     var tool *string
-    if (len(args) > 0) {
+    if len(args) > 0 {
         tool = (&args[0])
     }
 
@@ -142,21 +142,21 @@ func cmdList(args []string) error {
         // List both
         goVersions := install.ListInstalledGo()
         sopVersions := install.ListInstalledSop()
-        if ((len(goVersions) == 0) && (len(sopVersions) == 0)) {
+        if len(goVersions) == 0 && len(sopVersions) == 0 {
             fmt.Println("\033[2mNo versions installed\033[0m")
             fmt.Println("  \033[36mhint:\033[0m run \033[1msopmod install go latest\033[0m to install go")
             fmt.Println("  \033[36mhint:\033[0m run \033[1msopmod install sop latest\033[0m to install sop")
         } else {
-            if (len(goVersions) > 0) {
+            if len(goVersions) > 0 {
                 fmt.Println("\033[1mgo:\033[0m")
                 for _, v := range goVersions {
                     fmt.Printf("  %s\n", v)
                 }
             }
-            if (len(sopVersions) > 0) {
+            if len(sopVersions) > 0 {
                 fmt.Println("\033[1msop:\033[0m")
                 for _, v := range sopVersions {
-                    if ((cfg.DefaultSop != nil) && ((*cfg.DefaultSop) == v)) {
+                    if cfg.DefaultSop != nil && (*cfg.DefaultSop) == v {
                         fmt.Printf("  \033[32m%s\033[0m \033[2m(default)\033[0m\n", v)
                     } else {
                         fmt.Printf("  %s\n", v)
@@ -168,7 +168,7 @@ func cmdList(args []string) error {
         switch (*tool) {
         case "go":
             versions := install.ListInstalledGo()
-            if (len(versions) == 0) {
+            if len(versions) == 0 {
                 fmt.Println("\033[2mNo go versions installed\033[0m")
             } else {
                 fmt.Println("\033[1mInstalled go versions:\033[0m")
@@ -178,12 +178,12 @@ func cmdList(args []string) error {
             }
         case "sop":
             versions := install.ListInstalledSop()
-            if (len(versions) == 0) {
+            if len(versions) == 0 {
                 fmt.Println("\033[2mNo sop versions installed\033[0m")
             } else {
                 fmt.Println("\033[1mInstalled sop versions:\033[0m")
                 for _, v := range versions {
-                    if ((cfg.DefaultSop != nil) && ((*cfg.DefaultSop) == v)) {
+                    if cfg.DefaultSop != nil && (*cfg.DefaultSop) == v {
                         fmt.Printf("  \033[32m%s\033[0m \033[2m(default)\033[0m\n", v)
                     } else {
                         fmt.Printf("  %s\n", v)
@@ -198,7 +198,7 @@ func cmdList(args []string) error {
 }
 
 func cmdDefault(args []string) error {
-    if (len(args) < 1) {
+    if len(args) < 1 {
         return fmt.Errorf("usage: sopmod default <version>")
     }
 
@@ -214,7 +214,7 @@ func cmdDefault(args []string) error {
     versions := install.ListInstalledSop()
     found := false
     for _, v := range versions {
-        if (v == resolved) {
+        if v == resolved {
             found = true
             break
         }
@@ -245,7 +245,7 @@ func setDefaultSop(version string) error {
 
     // Install shim
     err := installShim()
-    if (err != nil) {
+    if err != nil {
         return err
     }
 
@@ -257,7 +257,7 @@ func setDefaultSop(version string) error {
         return _err0
     }
 
-    if (goVersion != "") {
+    if goVersion != "" {
         cfg.DefaultGo = (&goVersion)
         fmt.Printf("\033[32m✓\033[0m Default go version set to \033[1m%s\033[0m (compatible with sop %s)\n", goVersion, version)
     }
@@ -276,12 +276,12 @@ func promptInstall(tool string, version string) (bool, error) {
 
     reader := bufio.NewReader(os.Stdin)
     input, err := reader.ReadString('\n')
-    if (err != nil) {
+    if err != nil {
         return false, err
     }
 
     input = strings.ToLower(strings.TrimSpace(input))
-    return (((input == "") || (input == "y")) || (input == "yes")), nil
+    return input == "" || input == "y" || input == "yes", nil
 }
 
 func printPathHint() {
@@ -298,7 +298,7 @@ func printPathHint() {
 }
 
 func cmdRemove(args []string) error {
-    if (len(args) < 2) {
+    if len(args) < 2 {
         return fmt.Errorf("usage: sopmod remove <tool> <version>")
     }
 
@@ -323,7 +323,7 @@ func cmdRemove(args []string) error {
         }
         // Clear default if it was this version
         cfg := config.Load()
-        if ((cfg.DefaultSop != nil) && ((*cfg.DefaultSop) == resolved)) {
+        if cfg.DefaultSop != nil && (*cfg.DefaultSop) == resolved {
             cfg.DefaultSop = nil
             cfg.Save()
         }
@@ -335,7 +335,7 @@ func cmdRemove(args []string) error {
 
 func cmdUpdate(args []string) error {
     var tool *string
-    if (len(args) > 0) {
+    if len(args) > 0 {
         tool = (&args[0])
     }
 
@@ -366,7 +366,7 @@ func updateGo() error {
 
     installed := install.ListInstalledGo()
     for _, v := range installed {
-        if (v == latest) {
+        if v == latest {
             fmt.Printf("\033[32m✓\033[0m go \033[1m%s\033[0m is already the latest version\n", latest)
             return nil
         }
@@ -388,7 +388,7 @@ func updateSop() error {
     installed := install.ListInstalledSop()
     alreadyInstalled := false
     for _, v := range installed {
-        if (v == latest) {
+        if v == latest {
             alreadyInstalled = true
             break
         }
@@ -404,17 +404,17 @@ func updateSop() error {
     }
 
     // Update default if needed
-    shouldUpdateDefault := (oldDefault == nil)
-    if (oldDefault != nil) {
+    shouldUpdateDefault := oldDefault == nil
+    if oldDefault != nil {
         for _, v := range installed {
-            if (v == (*oldDefault)) {
+            if v == (*oldDefault) {
                 shouldUpdateDefault = true
                 break
             }
         }
     }
 
-    if (shouldUpdateDefault && ((cfg.DefaultSop == nil) || ((*cfg.DefaultSop) != latest))) {
+    if shouldUpdateDefault && (cfg.DefaultSop == nil || (*cfg.DefaultSop) != latest) {
         cfg.DefaultSop = (&latest)
 
         _err2 := installShim()
@@ -429,7 +429,7 @@ func updateSop() error {
             return _err3
         }
 
-        if (goVersion != "") {
+        if goVersion != "" {
             cfg.DefaultGo = (&goVersion)
             fmt.Printf("\033[32m✓\033[0m Default go version set to \033[1m%s\033[0m (compatible with sop %s)\n", goVersion, latest)
         }
@@ -442,7 +442,7 @@ func updateSop() error {
 
 func findOrInstallCompatibleGo(sopVersion string) (string, error) {
     compatInfo := compat.GoCompatFor(sopVersion)
-    if (compatInfo == nil) {
+    if compatInfo == nil {
         return "", nil
     }
 
@@ -452,13 +452,13 @@ func findOrInstallCompatibleGo(sopVersion string) (string, error) {
     var best string
     for _, v := range installedGo {
         if compat.IsGoCompatible(v, sopVersion) {
-            if ((best == "") || (compareVersions(v, best) > 0)) {
+            if best == "" || compareVersions(v, best) > 0 {
                 best = v
             }
         }
     }
 
-    if (best != "") {
+    if best != "" {
         return best, nil
     }
 
@@ -471,15 +471,15 @@ func compareVersions(a string, b string) int {
     aParts := strings.Split(a, ".")
     bParts := strings.Split(b, ".")
 
-    for i := 0; ((i < len(aParts)) && (i < len(bParts))); i++ {
+    for i := 0; i < len(aParts) && i < len(bParts); i++ {
         var aNum, bNum int
         fmt.Sscanf(aParts[i], "%d", (&aNum))
         fmt.Sscanf(bParts[i], "%d", (&bNum))
-        if (aNum != bNum) {
-            return (aNum - bNum)
+        if aNum != bNum {
+            return aNum - bNum
         }
     }
-    return (len(aParts) - len(bParts))
+    return len(aParts) - len(bParts)
 }
 
 func installShim() error {
@@ -499,7 +499,7 @@ func installShim() error {
     }
 
     // Make executable
-    return os.Chmod(shimPath, 493)
+    return os.Chmod(shimPath, 0o755)
 }
 
 func runShim() error {
@@ -521,13 +521,13 @@ func runShim() error {
 func findSopVersion() (string, error) {
     // Check sop.mod in current dir and parents
     version, err := findSopModVersion()
-    if ((err == nil) && (version != "")) {
+    if err == nil && version != "" {
         return version, nil
     }
 
     // Fall back to default
     cfg := config.Load()
-    if (cfg.DefaultSop != nil) {
+    if cfg.DefaultSop != nil {
         return (*cfg.DefaultSop), nil
     }
 
@@ -549,17 +549,17 @@ func findSopModVersion() (string, error) {
         if fileExists(sopModPath) {
             var modCfg SopMod
             _, err := toml.DecodeFile(sopModPath, (&modCfg))
-            if (err != nil) {
+            if err != nil {
                 return "", err
             }
-            if (modCfg.Sop != nil) {
+            if modCfg.Sop != nil {
                 return (*modCfg.Sop), nil
             }
             return "", nil
         }
 
         parent := filepath.Dir(current)
-        if (parent == current) {
+        if parent == current {
             break
         }
         current = parent
@@ -573,11 +573,11 @@ func copyFile(src string, dst string) error {
     if _err0 != nil {
         return _err0
     }
-    return os.WriteFile(dst, data, 493)
+    return os.WriteFile(dst, data, 0o755)
 }
 
 func fileExists(path string) bool {
     info, err := os.Stat(path)
-    return ((err == nil) && (!info.IsDir()))
+    return err == nil && (!info.IsDir())
 }
 

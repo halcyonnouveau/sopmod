@@ -19,7 +19,7 @@ export PATH="$HOME/.sopmod/bin:$PATH"
 ## Usage
 
 ```bash
-# Install latest sop (automatically set as default)
+# Install latest sop 
 sopmod install sop latest
 
 # Install a specific version
@@ -38,7 +38,7 @@ sopmod list
 sopmod remove sop 0.4.0
 ```
 
-## Per-project versions
+### Per-project versions
 
 Pin a specific Soppo version for your project by adding to `sop.mod`:
 
@@ -48,30 +48,12 @@ sop = "0.4"
 
 When you run `sop` in a directory with a `sop.mod` file, SOPMOD automatically uses the pinned version. Version matching is flexible - `sop = "0.4"` will match any 0.4.x version installed.
 
-If the required version isn't installed, you'll see:
+### Go versions
 
-```
-error: sop.mod requires sop 0.5, but 0.4.1 is installed
-
-  hint: sopmod can manage multiple versions
-```
-
-## Go versions
-
-Soppo compiles to Go, so it needs a Go installation. SOPMOD manages this automatically:
-
-```bash
-# Install Go (usually not needed - done automatically)
-sopmod install go 1.22
-
-# List installed Go versions
-sopmod list go
-```
-
-When you set a default Soppo version, SOPMOD automatically installs and configures a compatible Go version. You can also pin Go in `sop.mod`:
+Soppo compiles to Go, so it needs a Go installation. SOPMOD manages this automatically and when you set a default Soppo version, SOPMOD automatically installs and configures a compatible Go version. You can also pin a Go version in `sop.mod`:
 
 ```toml
-go = "1.22"
+go = "1.25"
 ```
 
 ## How it works

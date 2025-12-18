@@ -135,7 +135,7 @@ func InstallGo(version string, verbose bool) (string, error) {
 	}
 
 	// Create temp file
-	tmpFile := os.CreateTemp("", "go-*."+ext) ?
+	tmpFile := os.CreateTemp("", "go-*." + ext) ?
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 

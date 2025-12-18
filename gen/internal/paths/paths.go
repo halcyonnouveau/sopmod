@@ -10,7 +10,7 @@ func SopmodDir() string {
     home, _err0 := os.UserHomeDir()
     if _err0 != nil {
         err := _err0
-        panic(("could not determine home directory: " + err.Error()))
+        panic("could not determine home directory: " + err.Error())
     }
 
     return filepath.Join(home, ".sopmod")
@@ -29,7 +29,7 @@ func GoDir(version string) string {
 // GoBinary returns the Go binary path for a specific version
 func GoBinary(version string) string {
     dir := GoDir(version)
-    if (runtime.GOOS == "windows") {
+    if runtime.GOOS == "windows" {
         return filepath.Join(dir, "go", "bin", "go.exe")
     }
     return filepath.Join(dir, "go", "bin", "go")
@@ -48,7 +48,7 @@ func SopDir(version string) string {
 // SopBinary returns the sop binary path for a specific version
 func SopBinary(version string) string {
     dir := SopDir(version)
-    if (runtime.GOOS == "windows") {
+    if runtime.GOOS == "windows" {
         return filepath.Join(dir, "sop.exe")
     }
     return filepath.Join(dir, "sop")
@@ -67,7 +67,7 @@ func BinDir() string {
 // SopShim returns the shim binary path (~/.sopmod/bin/sop)
 func SopShim() string {
     dir := BinDir()
-    if (runtime.GOOS == "windows") {
+    if runtime.GOOS == "windows" {
         return filepath.Join(dir, "sop.exe")
     }
     return filepath.Join(dir, "sop")
@@ -77,7 +77,7 @@ func SopShim() string {
 func EnsureDirs() error {
     dirs := []string{GoRoot(), SopRoot(), BinDir()}
     for _, dir := range dirs {
-        _err0 := os.MkdirAll(dir, 493)
+        _err0 := os.MkdirAll(dir, 0o755)
         if _err0 != nil {
             return _err0
         }
