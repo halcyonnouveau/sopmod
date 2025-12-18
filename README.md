@@ -4,7 +4,7 @@ Version manager for [Soppo](https://github.com/halcyonnouveau/soppo). SOPMOD is 
 
 SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation.
 
-## Install
+## Installation
 
 ```bash
 curl -fsSL https://soppolang.dev/install.sh | sh
