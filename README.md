@@ -1,4 +1,4 @@
-# SOPMOD
+# SOPMOD II
 
 Version manager for [Soppo](https://github.com/halcyonnouveau/soppo).
 

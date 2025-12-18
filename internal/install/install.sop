@@ -1,0 +1,486 @@
+package install
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+
+	"github.com/halcyonnouveau/sopmod/internal/compat"
+	"github.com/halcyonnouveau/sopmod/internal/paths"
+)
+
+// Platform holds OS and architecture info for downloads
+type Platform struct {
+	OS   string
+	Arch string
+}
+
+// DetectPlatform returns the current platform
+func DetectPlatform() (?*Platform, error) {
+	var osName string
+	match runtime.GOOS {
+	case "linux":
+		osName = "linux"
+	case "darwin":
+		osName = "darwin"
+	case "windows":
+		osName = "windows"
+	default:
+		return nil, fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
+
+	var arch string
+	match runtime.GOARCH {
+	case "amd64":
+		arch = "amd64"
+	case "arm64":
+		arch = "arm64"
+	default:
+		return nil, fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
+	}
+
+	return &Platform{OS: osName, Arch: arch}, nil
+}
+
+func (p *Platform) GoArchiveExt() string {
+	if p.OS == "windows" {
+		return "zip"
+	}
+	return "tar.gz"
+}
+
+// GoRelease represents a Go release from go.dev/dl/?mode=json
+type GoRelease struct {
+	Version string `json:"version"`
+	Stable  bool   `json:"stable"`
+}
+
+// ResolveLatestGo resolves "latest" to the actual latest stable Go version
+func ResolveLatestGo() (string, error) {
+	resp := http.Get("https://go.dev/dl/?mode=json") ?
+	defer resp.Body.Close()
+
+	releases := []GoRelease{}
+	json.NewDecoder(resp.Body).(!nil).Decode(&releases) ?
+
+	for _, r := range releases {
+		if r.Stable {
+			return strings.TrimPrefix(r.Version, "go"), nil
+		}
+	}
+
+	return "", errors.New("no stable Go version found")
+}
+
+// ResolveGoVersion resolves a Go version, handling "latest" and partial versions
+func ResolveGoVersion(version string) (string, error) {
+	if version == "latest" {
+		return ResolveLatestGo()
+	}
+
+	// Check if it's a partial version like "1.22"
+	parts := strings.Split(version, ".")
+	if len(parts) == 2 {
+		resp := http.Get("https://go.dev/dl/?mode=json") ?
+		defer resp.Body.Close()
+
+		releases := []GoRelease{}
+		json.NewDecoder(resp.Body).(!nil).Decode(&releases) ?
+
+		prefix := "go" + version
+		for _, r := range releases {
+			if r.Stable && strings.HasPrefix(r.Version, prefix) {
+				return strings.TrimPrefix(r.Version, "go"), nil
+			}
+		}
+	}
+
+	return version, nil
+}
+
+// InstallGo installs a specific Go version
+func InstallGo(version string, verbose bool) (string, error) {
+	resolved := ResolveGoVersion(version) ?
+	platform := DetectPlatform() ?
+
+	dest := paths.GoDir(resolved)
+	if dirExists(dest) {
+		fmt.Printf("\033[32m✓\033[0m go \033[1m%s\033[0m is already installed\n", resolved)
+		return resolved, nil
+	}
+
+	ext := platform.GoArchiveExt()
+	filename := fmt.Sprintf("go%s.%s-%s.%s", resolved, platform.OS, platform.Arch, ext)
+	url := "https://go.dev/dl/" + filename
+
+	if verbose {
+		fmt.Printf("Downloading go %s from %s\n", resolved, url)
+	}
+
+	// Download
+	resp := http.Get(url) ?
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("version not found: go %s for %s-%s", resolved, platform.OS, platform.Arch)
+	}
+
+	// Create temp file
+	tmpFile := os.CreateTemp("", "go-*."+ext) ?
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	// Download with progress
+	fmt.Printf("Downloading go %s\n", resolved)
+	io.Copy(tmpFile, resp.Body) ?
+	tmpFile.Close()
+	fmt.Println("Download complete")
+
+	// Extract
+	if verbose {
+		fmt.Printf("Extracting to %s\n", dest)
+	}
+
+	os.MkdirAll(dest, 0o755) ?
+
+	if ext == "zip" {
+		extractZip(tmpFile.Name(), dest) ?
+	} else {
+		extractTarGz(tmpFile.Name(), dest) ?
+	}
+
+	// Verify
+	goBin := paths.GoBinary(resolved)
+	if !fileExists(goBin) {
+		return "", fmt.Errorf("go binary not found at %s", goBin)
+	}
+
+	fmt.Printf("\033[32m✓\033[0m go \033[1m%s\033[0m installed successfully\n", resolved)
+	return resolved, nil
+}
+
+// GitHubRelease represents a GitHub release
+type GitHubRelease struct {
+	TagName string        `json:"tag_name"`
+	Assets  []GitHubAsset `json:"assets"`
+}
+
+// GitHubAsset represents a GitHub release asset
+type GitHubAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+// ResolveLatestSop resolves "latest" to the actual latest sop version
+func ResolveLatestSop() (string, error) {
+	req := http.NewRequest("GET", "https://api.github.com/repos/halcyonnouveau/soppo/releases/latest", nil) ?
+	req.Header.Set("User-Agent", "sopmod")
+
+	resp := http.DefaultClient.(!nil).Do(req) ?
+	defer resp.Body.Close()
+
+	var release GitHubRelease
+	json.NewDecoder(resp.Body).(!nil).Decode(&release) ?
+
+	return strings.TrimPrefix(release.TagName, "v"), nil
+}
+
+// ResolveSopVersion resolves a sop version, handling "latest"
+func ResolveSopVersion(version string) (string, error) {
+	if version == "latest" {
+		return ResolveLatestSop()
+	}
+	return version, nil
+}
+
+// InstallSop installs a specific sop version
+func InstallSop(version string, verbose bool) (string, error) {
+	resolved := ResolveSopVersion(version) ?
+	platform := DetectPlatform() ?
+
+	dest := paths.SopDir(resolved)
+	if dirExists(dest) {
+		fmt.Printf("\033[32m✓\033[0m sop \033[1m%s\033[0m is already installed\n", resolved)
+		return resolved, nil
+	}
+
+	// Check Go compatibility
+	compatInfo := compat.GoCompatFor(resolved)
+	if compatInfo != nil {
+		installedGo := ListInstalledGo()
+		hasCompatible := false
+		for _, v := range installedGo {
+			if compat.IsGoCompatible(v, resolved) {
+				hasCompatible = true
+				break
+			}
+		}
+		if !hasCompatible && len(installedGo) > 0 {
+			fmt.Printf("\033[33mwarning:\033[0m %s\n", compat.CompatMessage(resolved))
+			fmt.Printf("  Installed go versions: %s\n", strings.Join(installedGo, ", "))
+			fmt.Printf("  \033[36mhint:\033[0m run \033[1msopmod install go %s\033[0m\n", compatInfo.Min)
+		}
+	}
+
+	// Map platform to Rust target triple
+	var targetTriple string
+	match platform.OS + "-" + platform.Arch {
+	case "linux-amd64":
+		targetTriple = "x86_64-unknown-linux-gnu"
+	case "linux-arm64":
+		targetTriple = "aarch64-unknown-linux-gnu"
+	case "darwin-amd64":
+		targetTriple = "x86_64-apple-darwin"
+	case "darwin-arm64":
+		targetTriple = "aarch64-apple-darwin"
+	case "windows-amd64":
+		targetTriple = "x86_64-pc-windows-msvc"
+	case "windows-arm64":
+		targetTriple = "aarch64-pc-windows-msvc"
+	default:
+		return "", fmt.Errorf("unsupported platform: %s-%s", platform.OS, platform.Arch)
+	}
+
+	// Fetch release info
+	tag := "v" + resolved
+	releaseURL := fmt.Sprintf("https://api.github.com/repos/halcyonnouveau/soppo/releases/tags/%s", tag)
+
+	req := http.NewRequest("GET", releaseURL, nil) ?
+	req.Header.Set("User-Agent", "sopmod")
+
+	resp := http.DefaultClient.(!nil).Do(req) ?
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("version not found: sop %s", resolved)
+	}
+
+	var release GitHubRelease
+	json.NewDecoder(resp.Body).(!nil).Decode(&release) ?
+
+	// Find the right asset
+	assetPattern := "sop-" + targetTriple
+	var asset ?*GitHubAsset
+	for i := range release.Assets {
+		if strings.HasPrefix(release.Assets[i].Name, assetPattern) {
+			asset = &release.Assets[i]
+			break
+		}
+	}
+	if asset == nil {
+		return "", fmt.Errorf("version not found: sop %s for %s", resolved, targetTriple)
+	}
+
+	if verbose {
+		fmt.Printf("Downloading sop %s from %s\n", resolved, asset.BrowserDownloadURL)
+	}
+
+	// Download
+	req = http.NewRequest("GET", asset.BrowserDownloadURL, nil) ?
+	req.Header.Set("User-Agent", "sopmod")
+
+	resp = http.DefaultClient.(!nil).Do(req) ?
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download: %s", resp.Status)
+	}
+
+	// Create temp file
+	tmpFile := os.CreateTemp("", "sop-*") ?
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	fmt.Printf("Downloading sop %s\n", resolved)
+	io.Copy(tmpFile, resp.Body) ?
+	tmpFile.Close()
+	fmt.Println("Download complete")
+
+	// Extract
+	if verbose {
+		fmt.Printf("Extracting to %s\n", dest)
+	}
+
+	os.MkdirAll(dest, 0o755) ?
+
+	if strings.HasSuffix(asset.Name, ".zip") {
+		extractZip(tmpFile.Name(), dest) ?
+	} else if strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz") {
+		extractTarGz(tmpFile.Name(), dest) ?
+	} else {
+		// Raw binary
+		binaryName := "sop"
+		if runtime.GOOS == "windows" {
+			binaryName = "sop.exe"
+		}
+		destPath := filepath.Join(dest, binaryName)
+		copyFile(tmpFile.Name(), destPath) ?
+		os.Chmod(destPath, 0o755)
+	}
+
+	// Verify
+	sopBin := paths.SopBinary(resolved)
+	if !fileExists(sopBin) {
+		return "", fmt.Errorf("sop binary not found at %s", sopBin)
+	}
+
+	fmt.Printf("\033[32m✓\033[0m sop \033[1m%s\033[0m installed successfully\n", resolved)
+	return resolved, nil
+}
+
+// ListInstalledGo returns a list of installed Go versions
+func ListInstalledGo() []string {
+	goRoot := paths.GoRoot()
+	if !dirExists(goRoot) {
+		return []string{}
+	}
+
+	entries := os.ReadDir(goRoot) ?
+
+	versions := []string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			versions = append(versions, e.Name())
+		}
+	}
+	return versions
+}
+
+// ListInstalledSop returns a list of installed sop versions
+func ListInstalledSop() []string {
+	sopRoot := paths.SopRoot()
+	if !dirExists(sopRoot) {
+		return []string{}
+	}
+
+	entries := os.ReadDir(sopRoot) ?
+
+	versions := []string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			versions = append(versions, e.Name())
+		}
+	}
+	return versions
+}
+
+// RemoveGo removes an installed Go version
+func RemoveGo(version string) error {
+	dir := paths.GoDir(version)
+	if !dirExists(dir) {
+		return fmt.Errorf("version not found: go %s", version)
+	}
+	os.RemoveAll(dir) ?
+	fmt.Printf("\033[32m✓\033[0m Removed go \033[1m%s\033[0m\n", version)
+	return nil
+}
+
+// RemoveSop removes an installed sop version
+func RemoveSop(version string) error {
+	dir := paths.SopDir(version)
+	if !dirExists(dir) {
+		return fmt.Errorf("version not found: sop %s", version)
+	}
+	os.RemoveAll(dir) ?
+	fmt.Printf("\033[32m✓\033[0m Removed sop \033[1m%s\033[0m\n", version)
+	return nil
+}
+
+func extractTarGz(archivePath, dest string) error {
+	f := os.Open(archivePath) ?
+	defer f.Close()
+
+	gzr := gzip.NewReader(f) ?
+	defer gzr.Close()
+	tr := tar.NewReader(gzr).(!nil)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(dest, header.Name)
+
+		match header.Typeflag {
+		case tar.TypeDir:
+			os.MkdirAll(target, 0o755) ?
+		case tar.TypeReg:
+			os.MkdirAll(filepath.Dir(target), 0o755) ?
+			outFile := os.Create(target) ?
+			_, err = io.Copy(outFile, tr)
+			outFile.Close()
+			if err != nil {
+				return err
+			}
+			os.Chmod(target, os.FileMode(header.Mode))
+		}
+	}
+	return nil
+}
+
+func extractZip(archivePath, dest string) error {
+	r := zip.OpenReader(archivePath) ?
+	defer r.Close()
+
+	for _, f := range r.File {
+		if f == nil {
+			continue
+		}
+
+		target := filepath.Join(dest, f.Name)
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(target, 0o755)
+			continue
+		}
+
+		os.MkdirAll(filepath.Dir(target), 0o755) ?
+
+		outFile := os.Create(target) ?
+		rc := f.Open() ?
+
+		_, err := io.Copy(outFile, rc)
+		rc.Close()
+		outFile.Close()
+		if err != nil {
+			return err
+		}
+
+		os.Chmod(target, f.Mode())
+	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in := os.Open(src) ?
+	defer in.Close()
+
+	out := os.Create(dst) ?
+	defer out.Close()
+
+	_, err := io.Copy(out, in)
+	return err
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}

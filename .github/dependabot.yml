@@ -1,19 +1,11 @@
 version: 2
 updates:
-  - package-ecosystem: cargo
-    directories:
-      - "/**"
+  - package-ecosystem: gomod
+    directory: "/"
     schedule:
       interval: weekly
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
-    groups:
-      all:
-        patterns:
-          - "*"
 
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly

@@ -1,0 +1,106 @@
+package compat
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// GoCompat holds Go version compatibility requirements for a sop version
+type GoCompat struct {
+	Min string   // Minimum required Go version (inclusive)
+	Max ?*string // Maximum supported Go version (inclusive), nil means no upper bound
+}
+
+// GoCompatFor returns the Go version compatibility for a given sop version
+func GoCompatFor(sopVersion string) ?*GoCompat {
+	version := strings.TrimPrefix(sopVersion, "v")
+
+	major, minor, _ := parseVersion(version) ? {
+		return nil
+	}
+
+	// Add new Go requirements here (check newest first)
+	// if major > 0 || (major == 0 && minor >= 6) {
+	//     return &GoCompat{Min: "1.25", Max: nil}
+	// }
+
+	if major > 0 || (major == 0 && minor >= 1) {
+		return &GoCompat{Min: "1.21", Max: nil}
+	}
+
+	return nil
+}
+
+// IsGoCompatible checks if a Go version satisfies the requirements for a sop version
+func IsGoCompatible(goVersion, sopVersion string) bool {
+	compat := GoCompatFor(sopVersion)
+	if compat == nil {
+		// Unknown sop version, assume compatible
+		return true
+	}
+
+	goMajor, goMinor, goPatch := parseVersion(goVersion) ? {
+		return false
+	}
+
+	minMajor, minMinor, minPatch := parseVersion(compat.Min) ? {
+		return false
+	}
+
+	// Check minimum
+	if !versionAtLeast(goMajor, goMinor, goPatch, minMajor, minMinor, minPatch) {
+		return false
+	}
+
+	// Check maximum if set
+	if compat.Max != nil {
+		maxMajor, maxMinor, maxPatch := parseVersion(*compat.Max) ? {
+			return false
+		}
+
+		if !versionAtLeast(maxMajor, maxMinor, maxPatch, goMajor, goMinor, goPatch) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// CompatMessage returns a human-readable compatibility message for a sop version
+func CompatMessage(sopVersion string) string {
+	compat := GoCompatFor(sopVersion)
+	if compat == nil {
+		return fmt.Sprintf("sop %s has unknown go requirements", sopVersion)
+	}
+	if compat.Max != nil {
+		return fmt.Sprintf("sop %s requires go %s to %s", sopVersion, compat.Min, *compat.Max)
+	}
+	return fmt.Sprintf("sop %s requires go %s or later", sopVersion, compat.Min)
+}
+
+func parseVersion(version string) (major, minor, patch int, err error) {
+	parts := strings.Split(version, ".")
+
+	if len(parts) >= 1 {
+		major = strconv.Atoi(parts[0]) ?
+	}
+	if len(parts) >= 2 {
+		minor = strconv.Atoi(parts[1]) ?
+	}
+	if len(parts) >= 3 {
+		patch = strconv.Atoi(parts[2]) ?
+	}
+
+	return major, minor, patch, nil
+}
+
+func versionAtLeast(aMajor, aMinor, aPatch, bMajor, bMinor, bPatch int) bool {
+	if aMajor != bMajor {
+		return aMajor > bMajor
+	}
+	if aMinor != bMinor {
+		return aMinor > bMinor
+	}
+	return aPatch >= bPatch
+}
