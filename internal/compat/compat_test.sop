@@ -1,0 +1,129 @@
+package compat
+
+import "testing"
+
+func TestParseVersion(t *testing.T) {
+	tests := []struct {
+		input               string
+		major, minor, patch int
+		wantErr             bool
+	}{
+		{"1.22.0", 1, 22, 0, false},
+		{"1.21", 1, 21, 0, false},
+		{"2", 2, 0, 0, false},
+		{"0.5.0", 0, 5, 0, false},
+		{"invalid", 0, 0, 0, true},
+	}
+
+	for _, tt := range tests {
+		major, minor, patch, err := parseVersion(tt.input)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("parseVersion(%q) expected error, got nil", tt.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("parseVersion(%q) unexpected error: %v", tt.input, err)
+			continue
+		}
+		if major != tt.major || minor != tt.minor || patch != tt.patch {
+			t.Errorf("parseVersion(%q) = (%d, %d, %d), want (%d, %d, %d)",
+				tt.input, major, minor, patch, tt.major, tt.minor, tt.patch)
+		}
+	}
+}
+
+func TestVersionAtLeast(t *testing.T) {
+	tests := []struct {
+		aMajor, aMinor, aPatch int
+		bMajor, bMinor, bPatch int
+		want                   bool
+	}{
+		{1, 22, 0, 1, 21, 0, true},  // 1.22.0 >= 1.21.0
+		{1, 21, 0, 1, 21, 0, true},  // 1.21.0 >= 1.21.0
+		{1, 20, 0, 1, 21, 0, false}, // 1.20.0 < 1.21.0
+		{2, 0, 0, 1, 99, 0, true},   // 2.0.0 >= 1.99.0
+		{1, 21, 5, 1, 21, 3, true},  // 1.21.5 >= 1.21.3
+		{1, 21, 3, 1, 21, 5, false}, // 1.21.3 < 1.21.5
+	}
+
+	for _, tt := range tests {
+		got := versionAtLeast(tt.aMajor, tt.aMinor, tt.aPatch, tt.bMajor, tt.bMinor, tt.bPatch)
+		if got != tt.want {
+			t.Errorf("versionAtLeast(%d.%d.%d, %d.%d.%d) = %v, want %v",
+				tt.aMajor, tt.aMinor, tt.aPatch, tt.bMajor, tt.bMinor, tt.bPatch, got, tt.want)
+		}
+	}
+}
+
+func TestGoCompatFor(t *testing.T) {
+	tests := []struct {
+		sopVersion string
+		wantMin    string
+		wantNil    bool
+	}{
+		{"0.5.0", "1.21", false},
+		{"v0.5.0", "1.21", false},
+		{"0.1.0", "1.21", false},
+		{"1.0.0", "1.21", false},
+		{"0.0.1", "1.21", false},
+	}
+
+	for _, tt := range tests {
+		got := GoCompatFor(tt.sopVersion)
+		if tt.wantNil {
+			if got != nil {
+				t.Errorf("GoCompatFor(%q) = %v, want nil", tt.sopVersion, got)
+			}
+			continue
+		}
+		if got == nil {
+			t.Errorf("GoCompatFor(%q) = nil, want non-nil", tt.sopVersion)
+			continue
+		}
+		if got.Min != tt.wantMin {
+			t.Errorf("GoCompatFor(%q).Min = %q, want %q", tt.sopVersion, got.Min, tt.wantMin)
+		}
+	}
+}
+
+func TestIsGoCompatible(t *testing.T) {
+	tests := []struct {
+		goVersion  string
+		sopVersion string
+		want       bool
+	}{
+		{"1.22.0", "0.5.0", true},
+		{"1.21.0", "0.5.0", true},
+		{"1.21", "0.5.0", true},
+		{"1.20.0", "0.5.0", false},
+		{"1.19.0", "0.5.0", false},
+		{"2.0.0", "0.5.0", true},
+	}
+
+	for _, tt := range tests {
+		got := IsGoCompatible(tt.goVersion, tt.sopVersion)
+		if got != tt.want {
+			t.Errorf("IsGoCompatible(%q, %q) = %v, want %v",
+				tt.goVersion, tt.sopVersion, got, tt.want)
+		}
+	}
+}
+
+func TestCompatMessage(t *testing.T) {
+	tests := []struct {
+		sopVersion string
+		want       string
+	}{
+		{"0.5.0", "sop 0.5.0 requires go 1.21 or later"},
+		{"invalid", "sop invalid has unknown go requirements"},
+	}
+
+	for _, tt := range tests {
+		got := CompatMessage(tt.sopVersion)
+		if got != tt.want {
+			t.Errorf("CompatMessage(%q) = %q, want %q", tt.sopVersion, got, tt.want)
+		}
+	}
+}
