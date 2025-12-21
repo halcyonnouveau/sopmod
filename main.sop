@@ -7,13 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
-	"github.com/BurntSushi/toml"
 	"github.com/halcyonnouveau/sopmod/internal/compat"
 	"github.com/halcyonnouveau/sopmod/internal/config"
 	"github.com/halcyonnouveau/sopmod/internal/install"
 	"github.com/halcyonnouveau/sopmod/internal/paths"
+	"github.com/halcyonnouveau/sopmod/internal/shim"
 )
 
 // Set at build time with -ldflags "-X main.version=v0.2.0"
@@ -26,7 +25,7 @@ func main() {
 	isShim := strings.HasSuffix(base, "sop") && !strings.HasSuffix(base, "sopmod")
 
 	if isShim {
-		runShim() ? err {
+		shim.Run() ? err {
 			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
 			os.Exit(1)
 		}
@@ -229,7 +228,7 @@ func setDefaultSop(version string) error {
 	cfg.DefaultSop = &version
 
 	// Install shim
-	err := installShim()
+	err := shim.Install()
 	if err != nil {
 		return err
 	}
@@ -375,7 +374,7 @@ func updateSop() error {
 	if shouldUpdateDefault && (cfg.DefaultSop == nil || *cfg.DefaultSop != latest) {
 		cfg.DefaultSop = &latest
 
-		installShim() ?
+		shim.Install() ?
 
 		fmt.Printf("\033[32m✓\033[0m Default sop version updated to \033[1m%s\033[0m\n", latest)
 
@@ -404,7 +403,7 @@ func findOrInstallCompatibleGo(sopVersion string) (string, error) {
 	var best string
 	for _, v := range installedGo {
 		if compat.IsGoCompatible(v, sopVersion) {
-			if best == "" || compareVersions(v, best) > 0 {
+			if best == "" || shim.CompareVersions(v, best) > 0 {
 				best = v
 			}
 		}
@@ -417,103 +416,4 @@ func findOrInstallCompatibleGo(sopVersion string) (string, error) {
 	// No compatible Go installed, install latest
 	fmt.Printf("\033[36m→\033[0m Installing go (sop %s requires \033[1m%s+\033[0m)...\n", sopVersion, compatInfo.Min)
 	return install.InstallGo("latest", false)
-}
-
-func compareVersions(a, b string) int {
-	aParts := strings.Split(a, ".")
-	bParts := strings.Split(b, ".")
-
-	for i := 0; i < len(aParts) && i < len(bParts); i++ {
-		var aNum, bNum int
-		fmt.Sscanf(aParts[i], "%d", &aNum)
-		fmt.Sscanf(bParts[i], "%d", &bNum)
-		if aNum != bNum {
-			return aNum - bNum
-		}
-	}
-	return len(aParts) - len(bParts)
-}
-
-func installShim() error {
-	currentExe := os.Executable() ?
-	shimPath := paths.SopShim()
-
-	// Remove existing shim
-	os.Remove(shimPath)
-
-	// Copy current binary to shim location
-	copyFile(currentExe, shimPath) ?
-
-	// Make executable
-	return os.Chmod(shimPath, 0o755)
-}
-
-func runShim() error {
-	version := findSopVersion() ?
-	sopBinary := paths.SopBinary(version)
-
-	if !fileExists(sopBinary) {
-		return fmt.Errorf("sop %s is not installed. Run `sopmod install sop %s`", version, version)
-	}
-
-	// Exec sop with all original args
-	args := append([]string{sopBinary}, os.Args[1:]...)
-	return syscall.Exec(sopBinary, args, os.Environ())
-}
-
-func findSopVersion() (string, error) {
-	// Check sop.mod in current dir and parents
-	version, err := findSopModVersion()
-	if err == nil && version != "" {
-		return version, nil
-	}
-
-	// Fall back to default
-	cfg := config.Load()
-	if cfg.DefaultSop != nil {
-		return *cfg.DefaultSop, nil
-	}
-
-	return "", fmt.Errorf("no sop version configured. Run `sopmod install sop latest`")
-}
-
-func findSopModVersion() (string, error) {
-	type SopMod struct {
-		Sop *string `toml:"sop"`
-	}
-
-	current := os.Getwd() ?
-
-	for {
-		sopModPath := filepath.Join(current, "sop.mod")
-		if fileExists(sopModPath) {
-			var modCfg SopMod
-			_, err := toml.DecodeFile(sopModPath, &modCfg)
-			if err != nil {
-				return "", err
-			}
-			if modCfg.Sop != nil {
-				return *modCfg.Sop, nil
-			}
-			return "", nil
-		}
-
-		parent := filepath.Dir(current)
-		if parent == current {
-			break
-		}
-		current = parent
-	}
-
-	return "", nil
-}
-
-func copyFile(src, dst string) error {
-	data := os.ReadFile(src) ?
-	return os.WriteFile(dst, data, 0o755)
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
