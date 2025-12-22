@@ -1,4 +1,4 @@
-//soppo:generated
+//soppo:generated v1
 package config
 
 import "os"
