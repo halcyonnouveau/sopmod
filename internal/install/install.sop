@@ -267,67 +267,34 @@ func InstallSop(version string, verbose bool) (string, error) {
 	var release GitHubRelease
 	json.NewDecoder(resp.Body).(!nil).Decode(&release) ?
 
-	// Find the right asset
-	assetPattern := "sop-" + targetTriple
-	var asset ?*GitHubAsset
+	// Find the sop and sopls assets
+	sopPattern := "sop-" + targetTriple
+	soplsPattern := "sopls-" + targetTriple
+	var sopAsset, soplsAsset ?*GitHubAsset
 	for i := range release.Assets {
-		if strings.HasPrefix(release.Assets[i].Name, assetPattern) {
-			asset = &release.Assets[i]
-			break
+		name := release.Assets[i].Name
+		if sopAsset == nil && strings.HasPrefix(name, sopPattern) {
+			sopAsset = &release.Assets[i]
+		}
+		if soplsAsset == nil && strings.HasPrefix(name, soplsPattern) {
+			soplsAsset = &release.Assets[i]
 		}
 	}
-	if asset == nil {
+	if sopAsset == nil {
 		return "", fmt.Errorf("version not found: sop %s for %s", resolved, targetTriple)
-	}
-
-	if verbose {
-		fmt.Printf("Downloading sop %s from %s\n", resolved, asset.BrowserDownloadURL)
-	}
-
-	// Download
-	req = http.NewRequest("GET", asset.BrowserDownloadURL, nil) ?
-	req.Header.Set("User-Agent", "sopmod")
-
-	resp = http.DefaultClient.(!nil).Do(req) ?
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download: %s", resp.Status)
-	}
-
-	// Create temp file
-	tmpFile := os.CreateTemp("", "sop-*") ?
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	fmt.Printf("Downloading sop %s\n", resolved)
-	io.Copy(tmpFile, resp.Body) ?
-	tmpFile.Close()
-	fmt.Println("Download complete")
-
-	// Extract
-	if verbose {
-		fmt.Printf("Extracting to %s\n", dest)
 	}
 
 	os.MkdirAll(dest, 0o755) ?
 
-	if strings.HasSuffix(asset.Name, ".zip") {
-		extractZip(tmpFile.Name(), dest) ?
-	} else if strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz") {
-		extractTarGz(tmpFile.Name(), dest) ?
-	} else {
-		// Raw binary
-		binaryName := "sop"
-		if runtime.GOOS == "windows" {
-			binaryName = "sop.exe"
-		}
-		destPath := filepath.Join(dest, binaryName)
-		copyFile(tmpFile.Name(), destPath) ?
-		os.Chmod(destPath, 0o755)
+	// Download sop
+	downloadBinary(sopAsset, dest, "sop", verbose) ?
+
+	// Download sopls if available
+	if soplsAsset != nil {
+		downloadBinary(soplsAsset, dest, "sopls", verbose) ?
 	}
 
-	// Verify
+	// Verify sop
 	sopBin := paths.SopBinary(resolved)
 	if !fileExists(sopBin) {
 		return "", fmt.Errorf("sop binary not found at %s", sopBin)
@@ -473,6 +440,49 @@ func copyFile(src, dst string) error {
 
 	_, err := io.Copy(out, in)
 	return err
+}
+
+func downloadBinary(asset *GitHubAsset, dest, name string, verbose bool) error {
+	if verbose {
+		fmt.Printf("Downloading %s from %s\n", name, asset.BrowserDownloadURL)
+	}
+
+	req := http.NewRequest("GET", asset.BrowserDownloadURL, nil) ?
+	req.Header.Set("User-Agent", "sopmod")
+
+	resp := http.DefaultClient.(!nil).Do(req) ?
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download %s: %s", name, resp.Status)
+	}
+
+	// Create temp file
+	tmpFile := os.CreateTemp("", name + "-*") ?
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	fmt.Printf("Downloading %s\n", name)
+	io.Copy(tmpFile, resp.Body) ?
+	tmpFile.Close()
+
+	// Extract or copy
+	if strings.HasSuffix(asset.Name, ".zip") {
+		extractZip(tmpFile.Name(), dest) ?
+	} else if strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz") {
+		extractTarGz(tmpFile.Name(), dest) ?
+	} else {
+		// Raw binary
+		binaryName := name
+		if runtime.GOOS == "windows" {
+			binaryName = name + ".exe"
+		}
+		destPath := filepath.Join(dest, binaryName)
+		copyFile(tmpFile.Name(), destPath) ?
+		os.Chmod(destPath, 0o755)
+	}
+
+	return nil
 }
 
 func fileExists(path string) bool {

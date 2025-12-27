@@ -273,12 +273,13 @@ func CmdUpdate(value UpdateCmd) Cmd {
 }
 
 func main() {
-	// Check if running as shim (invoked as "sop" not "sopmod")
+	// Check if running as shim (invoked as "sop" or "sopls" not "sopmod")
 	arg0 := os.Args[0]
 	base := filepath.Base(arg0)
-	isShim := strings.HasSuffix(base, "sop") && (!strings.HasSuffix(base, "sopmod"))
+	isSopShim := strings.HasSuffix(base, "sop") && (!strings.HasSuffix(base, "sopmod")) && (!strings.HasSuffix(base, "sopls"))
+	isSoplsShim := strings.HasSuffix(base, "sopls")
 
-	if isShim {
+	if isSopShim {
 		_err0 := shim.Run()
 		if _err0 != nil {
 			err := _err0
@@ -288,17 +289,27 @@ func main() {
 		return
 	}
 
+	if isSoplsShim {
+		_err1 := shim.RunLsp()
+		if _err1 != nil {
+			err := _err1
+			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Ensure sopmod directories exist
-	_err1 := paths.EnsureDirs()
-	if _err1 != nil {
-		err := _err1
+	_err2 := paths.EnsureDirs()
+	if _err2 != nil {
+		err := _err2
 		fmt.Fprintf(os.Stderr, "Failed to create sopmod directories: %s\n", err)
 		os.Exit(1)
 	}
 
-	_err2 := slap.Run[Cmd]()
-	if _err2 != nil {
-		err := _err2
+	_err3 := slap.Run[Cmd]()
+	if _err3 != nil {
+		err := _err3
 		fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
 		os.Exit(1)
 	}

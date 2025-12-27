@@ -2,7 +2,7 @@
 
 Version manager for [Soppo](https://github.com/halcyonnouveau/soppo). SOPMOD is entirely dogfooded and has been rewritten from Rust to Soppo, hence the "II".
 
-SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation.
+SOPMOD handles installing, updating, and switching between multiple versions of Soppo. It also manages Go installations that Soppo uses internally for compilation, and automatically installs `sopls` (the Soppo Language Server) alongside each Soppo version.
 
 ## Installation
 
@@ -65,19 +65,24 @@ SOPMOD installs versions to `~/.sopmod/`:
   config.toml        # Default versions
   bin/
     sop              # Shim that dispatches to correct version
+    sopls            # Shim for the language server
   go/
     1.22.0/
     1.23.0/
   sop/
     0.4.0/
+      sop
+      sopls
     0.4.1/
+      sop
+      sopls
 ```
 
-The `sop` binary in `~/.sopmod/bin/` is a shim that:
-1. Checks for `sop.mod` in the current or parent directories
-2. Uses the pinned version if specified
-3. Falls back to the default version from `config.toml`
-4. Executes the appropriate `sop` binary
+The `sop` and `sopls` binaries in `~/.sopmod/bin/` are shims that:
+1. Check for `sop.mod` in the current or parent directories
+2. Use the pinned version if specified
+3. Fall back to the default version from `config.toml`
+4. Execute the appropriate binary
 
 ## Licence
 

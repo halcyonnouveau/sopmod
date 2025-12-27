@@ -221,13 +221,22 @@ type Cmd enum {
 }
 
 func main() {
-	// Check if running as shim (invoked as "sop" not "sopmod")
+	// Check if running as shim (invoked as "sop" or "sopls" not "sopmod")
 	arg0 := os.Args[0]
 	base := filepath.Base(arg0)
-	isShim := strings.HasSuffix(base, "sop") && !strings.HasSuffix(base, "sopmod")
+	isSopShim := strings.HasSuffix(base, "sop") && !strings.HasSuffix(base, "sopmod") && !strings.HasSuffix(base, "sopls")
+	isSoplsShim := strings.HasSuffix(base, "sopls")
 
-	if isShim {
+	if isSopShim {
 		shim.Run() ? err {
+			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if isSoplsShim {
+		shim.RunLsp() ? err {
 			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
 			os.Exit(1)
 		}

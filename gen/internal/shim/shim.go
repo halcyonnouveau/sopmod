@@ -12,6 +12,15 @@ import "github.com/halcyonnouveau/sopmod/gen/internal/paths"
 
 // Run executes the sop shim, resolving versions and setting up the environment
 func Run() error {
+	return runBinary(paths.SopBinary)
+}
+
+// RunLsp executes the sopls shim, resolving versions and setting up the environment
+func RunLsp() error {
+	return runBinary(paths.SoplsBinary)
+}
+
+func runBinary(binaryPathFn func(string) string) error {
 	wantedSop, _err0 := findSopVersion()
 	if _err0 != nil {
 		return _err0
@@ -20,7 +29,7 @@ func Run() error {
 	if sopVersion == "" {
 		return fmt.Errorf("sop %s is not installed. Run `sopmod install sop %s`", wantedSop, wantedSop)
 	}
-	sopBinary := paths.SopBinary(sopVersion)
+	binary := binaryPathFn(sopVersion)
 
 	// Set up environment with managed Go version
 	env := os.Environ()
@@ -33,30 +42,38 @@ func Run() error {
 		env = append(env, "PATH=" + goBinDir + ":" + os.Getenv("PATH"))
 	}
 
-	// Exec sop with all original args
-	args := append([]string{sopBinary}, os.Args[1:]...)
-	return syscall.Exec(sopBinary, args, env)
+	// Exec binary with all original args
+	args := append([]string{binary}, os.Args[1:]...)
+	return syscall.Exec(binary, args, env)
 }
 
-// Install copies the current binary to the shim location
+// Install copies the current binary to both sop and sopls shim locations
 func Install() error {
 	currentExe, _err0 := os.Executable()
 	if _err0 != nil {
 		return _err0
 	}
-	shimPath := paths.SopShim()
 
-	// Remove existing shim
-	os.Remove(shimPath)
-
-	// Copy current binary to shim location
-	_err1 := copyFile(currentExe, shimPath)
+	// Install sop shim
+	sopShimPath := paths.SopShim()
+	os.Remove(sopShimPath)
+	_err1 := copyFile(currentExe, sopShimPath)
 	if _err1 != nil {
 		return _err1
 	}
+	_err2 := os.Chmod(sopShimPath, 0o755)
+	if _err2 != nil {
+		return _err2
+	}
 
-	// Make executable
-	return os.Chmod(shimPath, 0o755)
+	// Install sopls shim
+	soplsShimPath := paths.SoplsShim()
+	os.Remove(soplsShimPath)
+	_err3 := copyFile(currentExe, soplsShimPath)
+	if _err3 != nil {
+		return _err3
+	}
+	return os.Chmod(soplsShimPath, 0o755)
 }
 
 func findSopVersion() (string, error) {

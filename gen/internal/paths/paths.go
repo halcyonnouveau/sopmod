@@ -106,6 +106,23 @@ func SopBinary(version string) string {
 	return filepath.Join(dir, "sop")
 }
 
+// SoplsBinary returns the sopls binary path for a specific version.
+// On Windows, returns path ending in sopls.exe.
+//
+// ```sop,no_run
+// import "fmt"
+// fmt.Println(SoplsBinary("0.5.0"))
+// // Output (Unix):
+// // /home/user/.sopmod/sop/0.5.0/sopls
+// ```
+func SoplsBinary(version string) string {
+	dir := SopDir(version)
+	if runtime.GOOS == "windows" {
+		return filepath.Join(dir, "sopls.exe")
+	}
+	return filepath.Join(dir, "sopls")
+}
+
 // ConfigPath returns the config file path (~/.sopmod/config.toml).
 //
 // ```sop,no_run
@@ -146,6 +163,23 @@ func SopShim() string {
 		return filepath.Join(dir, "sop.exe")
 	}
 	return filepath.Join(dir, "sop")
+}
+
+// SoplsShim returns the sopls shim binary path (~/.sopmod/bin/sopls).
+// On Windows, returns path ending in sopls.exe.
+//
+// ```sop,no_run
+// import "fmt"
+// fmt.Println(SoplsShim())
+// // Output (Unix):
+// // /home/user/.sopmod/bin/sopls
+// ```
+func SoplsShim() string {
+	dir := BinDir()
+	if runtime.GOOS == "windows" {
+		return filepath.Join(dir, "sopls.exe")
+	}
+	return filepath.Join(dir, "sopls")
 }
 
 // EnsureDirs creates the sopmod directory structure.

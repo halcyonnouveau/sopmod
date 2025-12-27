@@ -14,12 +14,21 @@ import (
 
 // Run executes the sop shim, resolving versions and setting up the environment
 func Run() error {
+	return runBinary(paths.SopBinary)
+}
+
+// RunLsp executes the sopls shim, resolving versions and setting up the environment
+func RunLsp() error {
+	return runBinary(paths.SoplsBinary)
+}
+
+func runBinary(binaryPathFn func(string) string) error {
 	wantedSop := findSopVersion() ?
 	sopVersion := ResolveInstalledVersion(wantedSop, install.ListInstalledSop())
 	if sopVersion == "" {
 		return fmt.Errorf("sop %s is not installed. Run `sopmod install sop %s`", wantedSop, wantedSop)
 	}
-	sopBinary := paths.SopBinary(sopVersion)
+	binary := binaryPathFn(sopVersion)
 
 	// Set up environment with managed Go version
 	env := os.Environ()
@@ -32,24 +41,26 @@ func Run() error {
 		env = append(env, "PATH=" + goBinDir + ":" + os.Getenv("PATH"))
 	}
 
-	// Exec sop with all original args
-	args := append([]string{sopBinary}, os.Args[1:]...)
-	return syscall.Exec(sopBinary, args, env)
+	// Exec binary with all original args
+	args := append([]string{binary}, os.Args[1:]...)
+	return syscall.Exec(binary, args, env)
 }
 
-// Install copies the current binary to the shim location
+// Install copies the current binary to both sop and sopls shim locations
 func Install() error {
 	currentExe := os.Executable() ?
-	shimPath := paths.SopShim()
 
-	// Remove existing shim
-	os.Remove(shimPath)
+	// Install sop shim
+	sopShimPath := paths.SopShim()
+	os.Remove(sopShimPath)
+	copyFile(currentExe, sopShimPath) ?
+	os.Chmod(sopShimPath, 0o755) ?
 
-	// Copy current binary to shim location
-	copyFile(currentExe, shimPath) ?
-
-	// Make executable
-	return os.Chmod(shimPath, 0o755)
+	// Install sopls shim
+	soplsShimPath := paths.SoplsShim()
+	os.Remove(soplsShimPath)
+	copyFile(currentExe, soplsShimPath) ?
+	return os.Chmod(soplsShimPath, 0o755)
 }
 
 func findSopVersion() (string, error) {
