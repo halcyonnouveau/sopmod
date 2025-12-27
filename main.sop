@@ -2,11 +2,12 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	slap "github.com/beanpuppy/slap/gen"
 
 	"github.com/halcyonnouveau/sopmod/internal/compat"
 	"github.com/halcyonnouveau/sopmod/internal/config"
@@ -18,95 +19,25 @@ import (
 // Set at build time with -ldflags "-X main.version=v0.2.0"
 var version = "dev"
 
-func main() {
-	// Check if running as shim (invoked as "sop" not "sopmod")
-	arg0 := os.Args[0]
-	base := filepath.Base(arg0)
-	isShim := strings.HasSuffix(base, "sop") && !strings.HasSuffix(base, "sopmod")
+// Install a Go or sop version
+[slap.Command{Name: "install", About: "Install a Go or sop version"}]
+type InstallCmd struct {
+	[slap.Arg{Position: 0, Help: "Tool to install (go or sop)"}]
+	Tool string
 
-	if isShim {
-		shim.Run() ? err {
-			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
-			os.Exit(1)
-		}
-		return
-	}
+	[slap.Arg{Position: 1, Help: "Version to install (e.g. latest, 1.23.0)"}]
+	Version string
 
-	// Ensure sopmod directories exist
-	paths.EnsureDirs() ? err {
-		fmt.Fprintf(os.Stderr, "Failed to create sopmod directories: %s\n", err)
-		os.Exit(1)
-	}
-
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
-	cmd := os.Args[1]
-	args := os.Args[2:].(!nil)
-
-	var err ?error
-	match cmd {
-	case "install":
-		err = cmdInstall(args)
-	case "list":
-		err = cmdList(args)
-	case "default":
-		err = cmdDefault(args)
-	case "remove":
-		err = cmdRemove(args)
-	case "update":
-		err = cmdUpdate(args)
-	case "help", "-h", "--help":
-		printUsage()
-		return
-	case "version", "-v", "--version":
-		fmt.Println("sopmod " + version)
-		return
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
-		printUsage()
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
-		os.Exit(1)
-	}
+	[slap.Flag{Short: "v", Long: "verbose", Help: "Verbose output"}]
+	Verbose bool
 }
 
-func printUsage() {
-	fmt.Println("SOPMOD II - Soppo version manager")
-	fmt.Println()
-	fmt.Println("Usage: sopmod <command> [options]")
-	fmt.Println()
-	fmt.Println("Commands:")
-	fmt.Println("  install <tool> <version>  Install a Go or sop version")
-	fmt.Println("  list [tool]               List installed versions")
-	fmt.Println("  default <version>         Set the default sop version")
-	fmt.Println("  remove <tool> <version>   Remove an installed version")
-	fmt.Println("  update [tool]             Update to the latest version")
-}
-
-func cmdInstall(args []string) error {
-	fs := flag.NewFlagSet("install", flag.ExitOnError).(!nil)
-	verbose := fs.Bool("v", false, "Verbose output").(!nil)
-	fs.Parse(args)
-
-	remaining := fs.Args()
-	if len(remaining) < 2 {
-		return fmt.Errorf("usage: sopmod install <tool> <version>")
-	}
-
-	tool := remaining[0]
-	version := remaining[1]
-
-	match tool {
+func (cmd InstallCmd) Run() error {
+	match cmd.Tool {
 	case "go":
-		install.InstallGo(version, *verbose) ?
+		install.InstallGo(cmd.Version, cmd.Verbose) ?
 	case "sop":
-		resolved := install.InstallSop(version, *verbose) ?
+		resolved := install.InstallSop(cmd.Version, cmd.Verbose) ?
 
 		// Set as default if no default exists
 		cfg := config.Load()
@@ -115,22 +46,23 @@ func cmdInstall(args []string) error {
 			return setDefaultSop(resolved)
 		}
 	default:
-		return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", tool)
+		return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", cmd.Tool)
 	}
 
 	return nil
 }
 
-func cmdList(args []string) error {
+// List installed versions
+[slap.Command{Name: "list", About: "List installed versions"}]
+type ListCmd struct {
+	[slap.Arg{Position: 0, Help: "Tool to list (go or sop, omit for both)", Optional: true}]
+	Tool string
+}
+
+func (cmd ListCmd) Run() error {
 	cfg := config.Load()
 
-	var tool ?*string
-	if len(args) > 0 {
-		tool = &args[0]
-	}
-
-	match tool {
-	case nil:
+	if cmd.Tool == "" {
 		// List both
 		goVersions := install.ListInstalledGo()
 		sopVersions := install.ListInstalledSop()
@@ -157,8 +89,8 @@ func cmdList(args []string) error {
 				}
 			}
 		}
-	default:
-		match *tool {
+	} else {
+		match cmd.Tool {
 		case "go":
 			versions := install.ListInstalledGo()
 			if len(versions) == 0 {
@@ -184,21 +116,22 @@ func cmdList(args []string) error {
 				}
 			}
 		default:
-			return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", *tool)
+			return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", cmd.Tool)
 		}
 	}
 	return nil
 }
 
-func cmdDefault(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("usage: sopmod default <version>")
-	}
+// Set the default sop version
+[slap.Command{Name: "default", About: "Set the default sop version"}]
+type DefaultCmd struct {
+	[slap.Arg{Position: 0, Help: "Version to set as default"}]
+	Version string
+}
 
-	version := args[0]
-
+func (cmd DefaultCmd) Run() error {
 	// Resolve version first
-	resolved := install.ResolveSopVersion(version) ?
+	resolved := install.ResolveSopVersion(cmd.Version) ?
 
 	// Check if installed
 	versions := install.ListInstalledSop()
@@ -221,6 +154,96 @@ func cmdDefault(args []string) error {
 	}
 
 	return setDefaultSop(resolved)
+}
+
+// Remove an installed version
+[slap.Command{Name: "remove", About: "Remove an installed version"}]
+type RemoveCmd struct {
+	[slap.Arg{Position: 0, Help: "Tool to remove (go or sop)"}]
+	Tool string
+
+	[slap.Arg{Position: 1, Help: "Version to remove"}]
+	Version string
+}
+
+func (cmd RemoveCmd) Run() error {
+	match cmd.Tool {
+	case "go":
+		resolved := install.ResolveGoVersion(cmd.Version) ?
+		return install.RemoveGo(resolved)
+	case "sop":
+		resolved := install.ResolveSopVersion(cmd.Version) ?
+		install.RemoveSop(resolved) ?
+		// Clear default if it was this version
+		cfg := config.Load()
+		if cfg.DefaultSop != nil && *cfg.DefaultSop == resolved {
+			cfg.DefaultSop = nil
+			cfg.Save()
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", cmd.Tool)
+	}
+}
+
+// Update to the latest version
+[slap.Command{Name: "update", About: "Update to the latest version"}]
+type UpdateCmd struct {
+	[slap.Arg{Position: 0, Help: "Tool to update (go or sop, omit for both)", Optional: true}]
+	Tool string
+}
+
+func (cmd UpdateCmd) Run() error {
+	if cmd.Tool == "" {
+		updateGo() ?
+		return updateSop()
+	}
+
+	match cmd.Tool {
+	case "go":
+		return updateGo()
+	case "sop":
+		return updateSop()
+	default:
+		return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", cmd.Tool)
+	}
+}
+
+// All subcommands
+[slap.Command{Name: "sopmod", About: "Soppo version manager", Version: version}]
+[slap.Subcommands]
+type Cmd enum {
+	Install InstallCmd
+	List    ListCmd
+	Default DefaultCmd
+	Remove  RemoveCmd
+	Update  UpdateCmd
+}
+
+func main() {
+	// Check if running as shim (invoked as "sop" not "sopmod")
+	arg0 := os.Args[0]
+	base := filepath.Base(arg0)
+	isShim := strings.HasSuffix(base, "sop") && !strings.HasSuffix(base, "sopmod")
+
+	if isShim {
+		shim.Run() ? err {
+			fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Ensure sopmod directories exist
+	paths.EnsureDirs() ? err {
+		fmt.Fprintf(os.Stderr, "Failed to create sopmod directories: %s\n", err)
+		os.Exit(1)
+	}
+
+	slap.Run[Cmd]() ? err {
+		fmt.Fprintf(os.Stderr, "\033[31;1merror:\033[0m %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func setDefaultSop(version string) error {
@@ -273,55 +296,6 @@ func printPathHint() {
 	fmt.Printf("\033[36mhint:\033[0m Add \033[1m~/.sopmod/bin\033[0m to your PATH:\n")
 	fmt.Println()
 	fmt.Println("  \033[2mexport PATH=\"$HOME/.sopmod/bin:$PATH\"\033[0m")
-}
-
-func cmdRemove(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: sopmod remove <tool> <version>")
-	}
-
-	tool := args[0]
-	version := args[1]
-
-	match tool {
-	case "go":
-		resolved := install.ResolveGoVersion(version) ?
-		return install.RemoveGo(resolved)
-	case "sop":
-		resolved := install.ResolveSopVersion(version) ?
-		install.RemoveSop(resolved) ?
-		// Clear default if it was this version
-		cfg := config.Load()
-		if cfg.DefaultSop != nil && *cfg.DefaultSop == resolved {
-			cfg.DefaultSop = nil
-			cfg.Save()
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", tool)
-	}
-}
-
-func cmdUpdate(args []string) error {
-	var tool ?*string
-	if len(args) > 0 {
-		tool = &args[0]
-	}
-
-	match tool {
-	case nil:
-		updateGo() ?
-		return updateSop()
-	default:
-		match *tool {
-		case "go":
-			return updateGo()
-		case "sop":
-			return updateSop()
-		default:
-			return fmt.Errorf("unknown tool '%s'. Use 'go' or 'sop'", *tool)
-		}
-	}
 }
 
 func updateGo() error {

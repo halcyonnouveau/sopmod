@@ -2,4 +2,8 @@ module github.com/halcyonnouveau/sopmod
 
 go 1.25.4
 
-require github.com/BurntSushi/toml v1.6.0
+require (
+	github.com/BurntSushi/toml v1.6.0
+	github.com/beanpuppy/slap v0.1.2
+	github.com/halcyonnouveau/soppo/runtime v0.2.0
+)
